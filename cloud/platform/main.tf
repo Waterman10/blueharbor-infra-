@@ -3,10 +3,18 @@ terraform {
     vercel = {
       source = "vercel/vercel"
     }
+    supabase = {
+      source  = "supabase/supabase"
+      version = "~> 1.0"
+    }
   }
 }
 
-provider "vercel" {} # reads VERCEL_API_TOKEN
+provider "vercel" {
+  team = "team_xvZMkEiGJrbpmKzXuAqNbdO8"
+}
+
+provider "supabase" {} # reads SUPABASE_ACCESS_TOKEN
 
 variable "github_repo" {
   type        = string
@@ -17,9 +25,24 @@ variable "initials" {
   type = string
 }
 
+variable "supabase_org" {
+  type = string
+}
+
+variable "db_password" {
+  type      = string
+  sensitive = true
+}
+
+variable "supabase_key" {
+  type      = string
+  sensitive = true
+}
+
 resource "vercel_project" "trackit" {
   name           = "bh-trackit-${var.initials}"
   root_directory = "trackit"
+  framework      = "flask"
   git_repository = {
     type              = "github"
     repo              = var.github_repo
@@ -33,6 +56,32 @@ resource "vercel_project_environment_variable" "version" {
   value      = "1.1.0"
   target     = ["production", "preview"]
   sensitive  = false
+}
+
+resource "supabase_project" "trackit" {
+  organization_id   = var.supabase_org
+  name              = "bh-trackit-dev"
+  database_password = var.db_password
+  region            = "eu-west-3"
+  lifecycle {
+    ignore_changes = [database_password]
+  }
+}
+
+resource "vercel_project_environment_variable" "sb_url" {
+  project_id = vercel_project.trackit.id
+  key        = "SUPABASE_URL"
+  value      = "https://${supabase_project.trackit.id}.supabase.co"
+  target     = ["production", "preview"]
+  sensitive  = false
+}
+
+resource "vercel_project_environment_variable" "sb_key" {
+  project_id = vercel_project.trackit.id
+  key        = "SUPABASE_KEY"
+  value      = var.supabase_key
+  target     = ["production", "preview"]
+  sensitive  = true
 }
 
 output "project_id" {
