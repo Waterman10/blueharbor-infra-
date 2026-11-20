@@ -2,9 +2,9 @@ name: ci
 on:
   push:
     branches: [main]
-    paths: ["trackit/**", ".github/workflows/ci.yml"]
+    paths: ["trackit/**", "cloud/**", "k8s/**", ".github/workflows/ci.yml"]
   pull_request:
-    paths: ["trackit/**"]
+    paths: ["trackit/**", "cloud/**", "k8s/**", ".github/workflows/ci.yml"]
 permissions:
   contents: read
   packages: write
@@ -21,8 +21,17 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements.txt pytest
       - run: pytest -q
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install checkov
+      - run: checkov -d . --framework terraform,dockerfile,kubernetes --compact
   build:
-    needs: test
+    needs: [test, policy]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:

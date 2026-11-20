@@ -2,6 +2,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: trackit
+  annotations:
+    checkov.io/skip1: CKV_K8S_43=Lab image referenced by tag; pin by digest in production
+    checkov.io/skip2: CKV_K8S_14=Lab uses latest built by CI; use the commit SHA tag in production
+    checkov.io/skip3: CKV_K8S_21=Single-app minikube lab cluster; dedicated namespace in production
 spec:
   replicas: 3
   selector:
@@ -13,11 +17,28 @@ spec:
     metadata:
       labels: {app: trackit}
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: trackit
           image: ghcr.io/waterman10/trackit:latest
+          imagePullPolicy: Always
           ports: [{containerPort: 8000}]
           env: [{name: APP_VERSION, value: "1.2.0"}]
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           readinessProbe:
             httpGet: {path: /health, port: 8000}
             initialDelaySeconds: 3
@@ -27,12 +48,32 @@ spec:
           resources:
             requests: {cpu: 50m, memory: 64Mi}
             limits: {cpu: 250m, memory: 128Mi}
+      volumes:
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: trackit
+  annotations:
+    checkov.io/skip1: CKV_K8S_21=Single-app minikube lab cluster; dedicated namespace in production
 spec:
   type: NodePort
   selector: {app: trackit}
   ports: [{port: 80, targetPort: 8000}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: trackit
+  annotations:
+    checkov.io/skip1: CKV_K8S_21=Single-app minikube lab cluster; dedicated namespace in production
+spec:
+  podSelector:
+    matchLabels: {app: trackit}
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - port: 8000
+          protocol: TCP

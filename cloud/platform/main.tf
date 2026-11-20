@@ -23,6 +23,19 @@ variable "github_repo" {
 
 variable "initials" {
   type = string
+  validation {
+    condition     = can(regex("^[a-z]{2,3}$", var.initials))
+    error_message = "initials: 2 or 3 lower-case letters."
+  }
+}
+
+variable "region" {
+  type    = string
+  default = "eu-west-3"
+  validation {
+    condition     = contains(["eu-west-3", "eu-central-1"], var.region)
+    error_message = "Only EU regions are allowed for BlueHarbor data."
+  }
 }
 
 variable "supabase_org" {
@@ -62,7 +75,7 @@ resource "supabase_project" "trackit" {
   organization_id   = var.supabase_org
   name              = "bh-trackit-dev"
   database_password = var.db_password
-  region            = "eu-west-3"
+  region            = var.region
   lifecycle {
     ignore_changes = [database_password]
   }
